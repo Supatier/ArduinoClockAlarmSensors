@@ -44,13 +44,15 @@
 #include <LiquidCrystal.h>  // Required by LCDKeypad
 #include <LCDKeypad.h>
 #include "RTClib.h"
-
 #include "DHT.h"
+
 #define TIME_OUT 5  // One of the system's FSM transitions
 #define ALARM_TIME_MET 6  // One of the system's FSM transitions
-
 #define BUZZER_PIN 3  // Output PWM pin for the buzzer
 #define SNOOZE 10  // Minutes to snooze
+
+#define DHTPIN 2     // what digital pin we're connected to
+#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 // The different states of the system
 enum states
@@ -75,8 +77,6 @@ String sH;
 String sM;
 String sS;
 
-#define DHTPIN 2     // what digital pin we're connected to
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
 
 byte term[8] = //icon for termometer
 {
