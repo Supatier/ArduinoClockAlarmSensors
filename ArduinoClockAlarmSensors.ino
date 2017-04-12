@@ -31,6 +31,8 @@ enum states
 };
 int DD, MM, YY, H, M, S, set_state, up_state, down_state;
 int btnCount = 0;
+int sensorPin = A3;
+int sensorValue = 0;
 unsigned long previousMillis = 0;
 unsigned long currentMillis;
 String sDD;
@@ -40,6 +42,18 @@ String sH;
 String sM;
 String sS;
 
+DHT dht(DHTPIN, DHTTYPE);
+LCDKeypad lcd;
+
+RTC_DS1307 RTC;
+
+states state;  // Holds the current state of the system
+int8_t button;  // Holds the current button pressed
+uint8_t alarmHours = 0, alarmMinutes = 0;  // Holds the current alarm time
+uint8_t tmpHours;
+boolean alarm = false;  // Holds the current state of the alarm
+unsigned long timeRef;
+DateTime now;  // Holds the current date and time information
 
 byte term[8] = //icon for termometer
 {
@@ -65,20 +79,6 @@ byte pic[8] = //icon for water droplet
   B01110,
 };
 
-DHT dht(DHTPIN, DHTTYPE);
-LCDKeypad lcd;
-
-RTC_DS1307 RTC;
-
-states state;  // Holds the current state of the system
-int8_t button;  // Holds the current button pressed
-uint8_t alarmHours = 0, alarmMinutes = 0;  // Holds the current alarm time
-uint8_t tmpHours;
-boolean alarm = false;  // Holds the current state of the alarm
-unsigned long timeRef;
-DateTime now;  // Holds the current date and time information
-
-
 void setup()
 {
   pinMode(BUZZER_PIN, OUTPUT);  // Buzzer pin
@@ -87,6 +87,8 @@ void setup()
   lcd.begin(16, 2);
   Wire.begin();
   RTC.begin();
+  lcd.createChar(0, term);
+  lcd.createChar(1, pic);
 
   state = SHOW_TIME;  // Initial state of the FSM
   RTC.adjust(DateTime(__DATE__, __TIME__));
@@ -95,37 +97,51 @@ void setup()
 void loop()
 {
   timeRef = millis();
-
-  switch (state)
-  {
-    case SHOW_TIME:
-      showTime();
-      break;
-    case SHOW_TIME_ALARM_ON:
-      showTime();
-      checkAlarmTime();
-      break;
-    case SHOW_ALARM_TIME:
-      showAlarmTime();
-      break;
-    case SET_ALARM_HOUR:
-      setAlarmHours();
-      if ( state != SET_ALARM_MINUTES ) break;
-    case SET_ALARM_MINUTES:
-      setAlarmMinutes();
-      break;
-    case BUZZER_ON:
-      showTime();
-      break;
+  sensorValue = analogRead(sensorPin);
+  if (sensorValue < 60) {
+    while (sensorValue < 60) {
+      sensorValue = analogRead(sensorPin);
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("FIRE");
+      analogWrite(BUZZER_PIN, 255);
+      delay(200);
+    }
+    analogWrite(BUZZER_PIN, 0);
   }
 
-  while ( (unsigned long)(millis() - timeRef) < 970 )
-  {
-    if ( (button = lcd.button()) != KEYPAD_NONE )
+  else {
+    switch (state)
     {
-      while ( lcd.button() != KEYPAD_NONE ) ;
-      transition(button);
-      break;
+      case SHOW_TIME:
+        showTime();
+        break;
+      case SHOW_TIME_ALARM_ON:
+        showTime();
+        checkAlarmTime();
+        break;
+      case SHOW_ALARM_TIME:
+        showAlarmTime();
+        break;
+      case SET_ALARM_HOUR:
+        setAlarmHours();
+        if ( state != SET_ALARM_MINUTES ) break;
+      case SET_ALARM_MINUTES:
+        setAlarmMinutes();
+        break;
+      case BUZZER_ON:
+        showTime();
+        break;
+    }
+
+    while ( (unsigned long)(millis() - timeRef) < 970 )
+    {
+      if ( (button = lcd.button()) != KEYPAD_NONE )
+      {
+        while ( lcd.button() != KEYPAD_NONE ) ;
+        transition(button);
+        break;
+      }
     }
   }
 }
@@ -193,8 +209,8 @@ void transition(uint8_t trigger)
 void showTime()
 {
   now = RTC.now();
-  lcd.clear();
   lcdPrint();
+  //lcd.clear();
   DateTime now = RTC.now();
   DD = now.day();
   MM = now.month();
@@ -236,6 +252,7 @@ void lcdPrint() {
   get_sens();
 }
 void getTime() {
+  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(sH);
   lcd.print(":");
@@ -256,12 +273,12 @@ void get_sens()
   float t = dht.readTemperature();
 
   lcd.setCursor(0, 1);
-  lcd.write(1);
+  lcd.write(byte(0));
   lcd.print(" ");
-  lcd.print(t,1);
+  lcd.print(t, 1);
   lcd.print((char)223); //degree sign
-  lcd.print("C  ");
-  lcd.write(2);
+  lcd.print("C ");
+  lcd.write(byte(1));
   lcd.print(" ");
   lcd.print(h);
   lcd.print("%");
