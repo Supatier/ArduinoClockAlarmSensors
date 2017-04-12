@@ -260,7 +260,7 @@ void get_sens()
   lcd.print(" ");
   lcd.print(t,1);
   lcd.print((char)223); //degree sign
-  lcd.print("C ");
+  lcd.print("C  ");
   lcd.write(2);
   lcd.print(" ");
   lcd.print(h);
