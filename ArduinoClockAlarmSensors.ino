@@ -150,7 +150,7 @@ void transition(uint8_t trigger)
       }
       else if ( trigger == KEYPAD_SELECT ) state = SET_ALARM_HOUR;
       else if ( trigger == ALARM_TIME_MET ) {
-        analogWrite(BUZZER_PIN, 220);
+        analogWrite(BUZZER_PIN, 255);
         state = BUZZER_ON;
       }
       break;
@@ -193,6 +193,7 @@ void transition(uint8_t trigger)
 void showTime()
 {
   now = RTC.now();
+  lcd.clear();
   lcdPrint();
   DateTime now = RTC.now();
   DD = now.day();
@@ -249,21 +250,22 @@ void getTime() {
 
 void get_sens()
 {
-  delay(2000);
+  delay(000);
 
   int h = dht.readHumidity();
   int t = dht.readTemperature();
 
   lcd.setCursor(0, 1);
   lcd.write(1);
-  lcd.print(":");
-  lcd.print(t);
+  lcd.print(" ");
+  lcd.print(t,1);
   lcd.print((char)223); //degree sign
-  lcd.print("C ");
+  lcd.print("C  ");
   lcd.write(2);
-  lcd.print(":");
+  lcd.print(" ");
   lcd.print(h);
   lcd.print("%");
+  lcd.print(alarm ? " #" : "");
 }
 
 void showAlarmTime()
