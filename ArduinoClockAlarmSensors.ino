@@ -3,6 +3,8 @@
   Originaly by:
      Nick Lamprianidis { paign10.ln [at] gmail [dot] com }
   ---------------------------------------------------------
+  
+Modified By Supatier (supatier@gmail.com)
 
 */
 
@@ -16,9 +18,9 @@
 #define ALARM_TIME_MET 6
 #define BUZZER_PIN 3
 #define SNOOZE 10
-
-#define DHTPIN 2     // what digital pin we're connected to
-#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
+#define DHTPIN 2
+#define DHTTYPE DHT22
+#define RELAY_PIN 5
 
 enum states
 {
@@ -81,17 +83,19 @@ byte pic[8] = //icon for water droplet
 
 void setup()
 {
-  pinMode(BUZZER_PIN, OUTPUT);  // Buzzer pin
-
-  // Initializes the LCD and RTC instances
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(RELAY_PIN, OUTPUT);
+  
   lcd.begin(16, 2);
   Wire.begin();
   RTC.begin();
   lcd.createChar(0, term);
   lcd.createChar(1, pic);
-
-  state = SHOW_TIME;  // Initial state of the FSM
-  RTC.adjust(DateTime(__DATE__, __TIME__));
+  state = SHOW_TIME;
+  int h = dht.readHumidity();
+  float t = dht.readTemperature();
+  //RTC.adjust(DateTime(__DATE__, __TIME__));
+  delay(500);
 }
 
 void loop()
@@ -105,9 +109,15 @@ void loop()
       lcd.setCursor(0, 0);
       lcd.print("FIRE");
       analogWrite(BUZZER_PIN, 255);
-      delay(200);
+      digitalWrite(RELAY_PIN, HIGH);
+      sensorValue = analogRead(sensorPin);
+      delay(5000);
+      digitalWrite(RELAY_PIN, LOW);
+      sensorValue = analogRead(sensorPin);
+      delay(1000);
     }
     analogWrite(BUZZER_PIN, 0);
+    digitalWrite(RELAY_PIN, LOW);
   }
 
   else {
@@ -154,6 +164,7 @@ void transition(uint8_t trigger)
       if ( trigger == KEYPAD_LEFT ) state = SHOW_ALARM_TIME;
       else if ( trigger == KEYPAD_RIGHT ) {
         alarm = true;
+        lcd.clear();
         state = SHOW_TIME_ALARM_ON;
       }
       else if ( trigger == KEYPAD_SELECT ) state = SET_ALARM_HOUR;
@@ -162,6 +173,7 @@ void transition(uint8_t trigger)
       if ( trigger == KEYPAD_LEFT ) state = SHOW_ALARM_TIME;
       else if ( trigger == KEYPAD_RIGHT ) {
         alarm = false;
+        lcd.clear();
         state = SHOW_TIME;
       }
       else if ( trigger == KEYPAD_SELECT ) state = SET_ALARM_HOUR;
@@ -172,6 +184,7 @@ void transition(uint8_t trigger)
       break;
     case SHOW_ALARM_TIME:
       if ( trigger == TIME_OUT ) {
+        lcd.clear();
         if ( !alarm ) state = SHOW_TIME;
         else state = SHOW_TIME_ALARM_ON;
       }
@@ -200,6 +213,7 @@ void transition(uint8_t trigger)
       }
       if ( trigger == KEYPAD_SELECT || trigger == KEYPAD_LEFT ) {
         analogWrite(BUZZER_PIN, 0);
+        lcd.clear();
         alarm = false; state = SHOW_TIME;
       }
       break;
@@ -209,16 +223,13 @@ void transition(uint8_t trigger)
 void showTime()
 {
   now = RTC.now();
-  lcdPrint();
-  //lcd.clear();
-  DateTime now = RTC.now();
   DD = now.day();
   MM = now.month();
   YY = now.year();
   H = now.hour();
   M = now.minute();
   S = now.second();
-
+  
   if (DD < 10) {
     sDD = '0' + String(DD);
   } else {
@@ -245,14 +256,11 @@ void showTime()
   } else {
     sS = S;
   }
-}
-
-void lcdPrint() {
   getTime();
   get_sens();
 }
+
 void getTime() {
-  lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print(sH);
   lcd.print(":");
@@ -267,8 +275,6 @@ void getTime() {
 
 void get_sens()
 {
-  delay(000);
-
   int h = dht.readHumidity();
   float t = dht.readTemperature();
 
