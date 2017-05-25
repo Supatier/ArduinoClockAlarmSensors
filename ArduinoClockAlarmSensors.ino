@@ -20,7 +20,7 @@ Modified By Supatier (supatier@gmail.com)
 #define SNOOZE 10
 #define DHTPIN 2
 #define DHTTYPE DHT22
-#define RELAY_PIN 5
+#define RELAY_PIN 12
 
 enum states
 {
