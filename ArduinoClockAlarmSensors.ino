@@ -11,6 +11,7 @@ Modified By Supatier (supatier@gmail.com)
 #include <Wire.h>  // Required by RTClib
 #include <LiquidCrystal.h>  // Required by LCDKeypad
 #include <LCDKeypad.h>
+#include "SoftwareSerial.h"
 #include "RTClib.h"
 #include "DHT.h"
 
@@ -20,7 +21,39 @@ Modified By Supatier (supatier@gmail.com)
 #define SNOOZE 10
 #define DHTPIN 2
 #define DHTTYPE DHT22
-#define RELAY_PIN 12
+#define RELAY_PIN 11
+
+int DD, MM, YY, H, M, S, set_state, up_state, down_state;
+int btnCount = 0;
+int sensorPin = A3;
+int sensorValue = 0;
+
+unsigned long previousMillis = 0;
+unsigned long currentMillis;
+
+String sDD;
+String sMM;
+String sYY;
+String sH;
+String sM;
+String sS;
+String ssid = "null";
+String password = "027412345678";
+String data;
+String server = "pensamig.000webhostapp.com"; // www.example.com
+String uri = "/esp.php";// our example is /esppost.php
+
+DHT dht(DHTPIN, DHTTYPE);
+LCDKeypad lcd;
+RTC_DS1307 RTC;
+DateTime now;  // Holds the current date and time information
+SoftwareSerial esp(12, 13);
+
+int8_t button;  // Holds the current button pressed
+uint8_t alarmHours = 0, alarmMinutes = 0;  // Holds the current alarm time
+uint8_t tmpHours;
+boolean alarm = false;  // Holds the current state of the alarm
+unsigned long timeRef;
 
 enum states
 {
@@ -31,31 +64,9 @@ enum states
   SET_ALARM_MINUTES,
   BUZZER_ON
 };
-int DD, MM, YY, H, M, S, set_state, up_state, down_state;
-int btnCount = 0;
-int sensorPin = A3;
-int sensorValue = 0;
-unsigned long previousMillis = 0;
-unsigned long currentMillis;
-String sDD;
-String sMM;
-String sYY;
-String sH;
-String sM;
-String sS;
-
-DHT dht(DHTPIN, DHTTYPE);
-LCDKeypad lcd;
-
-RTC_DS1307 RTC;
 
 states state;  // Holds the current state of the system
-int8_t button;  // Holds the current button pressed
-uint8_t alarmHours = 0, alarmMinutes = 0;  // Holds the current alarm time
-uint8_t tmpHours;
-boolean alarm = false;  // Holds the current state of the alarm
-unsigned long timeRef;
-DateTime now;  // Holds the current date and time information
+
 
 byte term[8] = //icon for termometer
 {
@@ -85,17 +96,23 @@ void setup()
 {
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(RELAY_PIN, OUTPUT);
-  
+  esp.begin(115200);
+  Serial.begin(115200);
   lcd.begin(16, 2);
   Wire.begin();
   RTC.begin();
   lcd.createChar(0, term);
   lcd.createChar(1, pic);
+  reset();
+  connectWifi();
   state = SHOW_TIME;
-  int h = dht.readHumidity();
+  float h = dht.readHumidity();
   float t = dht.readTemperature();
+  esp.begin(115200);
+  Serial.begin(115200);
   //RTC.adjust(DateTime(__DATE__, __TIME__));
   delay(500);
+  lcd.clear();
 }
 
 void loop()
@@ -156,8 +173,16 @@ void loop()
   }
 }
 
-void transition(uint8_t trigger)
-{
+void reset() {
+  esp.println("AT+RST");
+  delay(1000);
+  if (esp.find("OK") ) 
+    Serial.println("Module Reset");
+    lcd.setCursor(0, 0);
+    lcd.print("Module Reset");
+}
+
+void transition(uint8_t trigger) {
   switch (state)
   {
     case SHOW_TIME:
@@ -220,8 +245,7 @@ void transition(uint8_t trigger)
   }
 }
 
-void showTime()
-{
+void showTime() {
   now = RTC.now();
   DD = now.day();
   MM = now.month();
@@ -273,9 +297,8 @@ void getTime() {
   lcd.print(sYY);
 }
 
-void get_sens()
-{
-  int h = dht.readHumidity();
+void get_sens() {
+  float h = dht.readHumidity();
   float t = dht.readTemperature();
 
   lcd.setCursor(0, 1);
@@ -286,13 +309,15 @@ void get_sens()
   lcd.print("C ");
   lcd.write(byte(1));
   lcd.print(" ");
-  lcd.print(h);
+  lcd.print(h, 0);
   lcd.print("%");
   lcd.print(alarm ? " #" : "");
+
+   data = "temperature=" + String(t) + "&humidity=" + String(h);// data sent must be under this form //name1=value1&name2=value2.
+   httppost();
 }
 
-void showAlarmTime()
-{
+void showAlarmTime() {
   lcd.clear();
   lcd.print("Alarm Time");
   lcd.setCursor(0, 1);
@@ -302,13 +327,11 @@ void showAlarmTime()
   transition(TIME_OUT);
 }
 
-void checkAlarmTime()
-{
+void checkAlarmTime() {
   if ( now.hour() == alarmHours && now.minute() == alarmMinutes ) transition(ALARM_TIME_MET);
 }
 
-void snooze()
-{
+void snooze() {
   alarmMinutes += SNOOZE;
   if ( alarmMinutes > 59 )
   {
@@ -317,8 +340,7 @@ void snooze()
   }
 }
 
-void setAlarmHours()
-{
+void setAlarmHours() {
   unsigned long timeRef;
   boolean timeOut = true;
 
@@ -367,8 +389,9 @@ void setAlarmHours()
   else transition(TIME_OUT);
 }
 
-void setAlarmMinutes()
-{
+void setAlarmMinutes() {
+
+ 
   unsigned long timeRef;
   boolean timeOut = true;
   uint8_t tmpMinutes = 0;
@@ -420,4 +443,62 @@ void setAlarmMinutes()
     transition(KEYPAD_SELECT);
   }
   else transition(TIME_OUT);
+}
+
+void httppost () {
+
+  esp.println("AT+CIPSTART=\"TCP\",\"" + server + "\",80");//start a TCP connection.
+
+  if ( esp.find("OK")) {
+
+    Serial.println("TCP connection ready");
+
+  } 
+  delay(200);
+
+  String postRequest =
+    "POST " + uri + " HTTP/1.0\r\n" +
+    "Host: " + server + "\r\n" +
+    "Accept: *" + "/" + "*\r\n" +
+    "Content-Length: " + data.length() + "\r\n" +
+    "Content-Type: application/x-www-form-urlencoded\r\n" +
+    "\r\n" + data;
+
+  String sendCmd = "AT+CIPSEND=";//determine the number of caracters to be sent.
+  esp.print(sendCmd);
+  esp.println(postRequest.length() );
+  delay(200);
+
+  if (esp.find(">")) {
+    Serial.println("Sending.."); esp.print(postRequest);
+    if ( esp.find("SEND OK")) {
+      Serial.println("Packet sent");
+      while (esp.available()) {
+        String tmpResp = esp.readString();
+        Serial.println(tmpResp);
+      }
+      // close the connection
+      esp.println("AT+CIPCLOSE");
+    }
+  }
+}
+
+void connectWifi() {
+  String cmd = "AT+CWJAP=\"" + ssid + "\",\"" + password + "\"";
+  esp.println(cmd);
+  delay(2000);
+  if (esp.find("OK")) {
+    Serial.println("Connected!");
+    lcd.setCursor(0, 1);
+    lcd.print("Connected!");
+  }
+
+  else {
+    connectWifi();
+    lcd.clear();
+    Serial.println("Cannot connect to wifi");
+    lcd.setCursor(0, 1);
+    lcd.print("Cannot connect to wifi");
+  }
+
 }
