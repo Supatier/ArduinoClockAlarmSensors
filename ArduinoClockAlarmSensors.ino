@@ -3,17 +3,17 @@
   Originaly by:
      Nick Lamprianidis { paign10.ln [at] gmail [dot] com }
   ---------------------------------------------------------
-  
-Modified By Supatier (supatier@gmail.com)
+
+  Modified By Supatier (supatier@gmail.com)
 
 */
 
 #include <Wire.h>  // Required by RTClib
 #include <LiquidCrystal.h>  // Required by LCDKeypad
 #include <LCDKeypad.h>
-#include "SoftwareSerial.h"
-#include "RTClib.h"
-#include "DHT.h"
+#include <SoftwareSerial.h>
+#include <RTClib.h>
+#include <DHT.h>
 
 #define TIME_OUT 5
 #define ALARM_TIME_MET 6
@@ -176,10 +176,10 @@ void loop()
 void reset() {
   esp.println("AT+RST");
   delay(1000);
-  if (esp.find("OK") ) 
+  if (esp.find("OK") )
     Serial.println("Module Reset");
-    lcd.setCursor(0, 0);
-    lcd.print("Module Reset");
+  lcd.setCursor(0, 0);
+  lcd.print("Module Reset");
 }
 
 void transition(uint8_t trigger) {
@@ -253,7 +253,7 @@ void showTime() {
   H = now.hour();
   M = now.minute();
   S = now.second();
-  
+
   if (DD < 10) {
     sDD = '0' + String(DD);
   } else {
@@ -313,8 +313,8 @@ void get_sens() {
   lcd.print("%");
   lcd.print(alarm ? " #" : "");
 
-   data = "temperature=" + String(t) + "&humidity=" + String(h);// data sent must be under this form //name1=value1&name2=value2.
-   httppost();
+  data = "temperature=" + String(t) + "&humidity=" + String(h);// data sent must be under this form //name1=value1&name2=value2.
+  httppost();
 }
 
 void showAlarmTime() {
@@ -391,7 +391,7 @@ void setAlarmHours() {
 
 void setAlarmMinutes() {
 
- 
+
   unsigned long timeRef;
   boolean timeOut = true;
   uint8_t tmpMinutes = 0;
@@ -453,7 +453,7 @@ void httppost () {
 
     Serial.println("TCP connection ready");
 
-  } 
+  }
   delay(200);
 
   String postRequest =
